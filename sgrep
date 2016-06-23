@@ -1,0 +1,23 @@
+#!/bin/bash
+
+test "x$1" = "x" && exit -1;
+
+END_FILE_GREP="--"
+
+while test "x$1" != "x"; do
+	if test "$1" = "--"; then
+		END_FILE_GREP=""
+	fi
+	PARAMS="$PARAMS \"$1\""
+	shift
+done
+
+NGREP="ngrep -n \"\(build-for-\|\.svn\|\.swp$\|~$|\)\" -n \"\.moc/\" \"\.\(h\|c\|cpp\|cc\|py\|rb\|php\|java\|qml\|js\|css\|html\|sh\)$\" $END_FILE_GREP $PARAMS"
+
+echo -en "\e[1m"
+echo "ngrep command:	[$NGREP]"
+echo -en "\e[0m"
+echo
+
+eval $NGREP
+

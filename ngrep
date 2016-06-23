@@ -1,0 +1,69 @@
+#!/bin/bash
+
+test "x$1" = "x" && exit -1;
+
+PID=${BASHPID}
+export GREP_COLORS='mt=33:sl=:cx=:fn=35:ln=33:bn=33:se=33'
+
+while test "x$1" != "x"; do
+	if test "$1" = "--"; then
+		LINE_GREP_PARAMS="true"
+		shift
+		continue;
+	fi
+	if test "$LINE_GREP_PARAMS" != "true"; then
+		FILE_GREP_CMD="$FILE_GREP_CMD | grep -zZ"
+		test "$1" = "-n" && FILE_GREP_CMD="$FILE_GREP_CMD -v" && shift
+		FILE_GREP_CMD="$FILE_GREP_CMD \"$1\""
+		shift
+	else
+		if test "x$CODE_GREP_CMD" = "x"; then
+			CODE_GREP_CMD="grep --color=always -n"
+		else
+			CODE_GREP_CMD="$CODE_GREP_CMD | grep --color=always"
+		fi
+		test "$1" = "-n" && CODE_GREP_CMD="$CODE_GREP_CMD -v" && shift
+		CODE_GREP_CMD="$CODE_GREP_CMD \"$1\""
+		shift
+	fi
+done
+
+if test "x$FILE_GREP_CMD" = "x"; then
+	FILE_GREP_CMD=" | grep -zZv \"\.svn\" | grep -zZv \"\.git\" | grep -zZv \"\.swp$\" | grep -zZv \"~$\""
+fi
+
+FILE_GREP_CMD="find . -print0 $FILE_GREP_CMD"
+if test "x$CODE_GREP_CMD" != "x"; then
+	CODE_GREP_CMD="cat \"\$file\" | ${CODE_GREP_CMD}"
+fi
+
+echo -en "\e[1m"
+echo "File selector command:	[$FILE_GREP_CMD]"
+echo "Grep command:		[$CODE_GREP_CMD]"
+echo -en "\e[0m"
+echo
+
+if test "x$CODE_GREP_CMD" = "x"; then
+	$(eval ${FILE_GREP_CMD}" > ${HOME}/list.tmp.${PID}")
+	$(eval echo -n "${HOME}/list.tmp.${PID}" | sort --files0-from=- -z > ${HOME}/list.ordered.tmp.${PID})
+	cat ${HOME}/list.ordered.tmp.${PID} | while read -d $'\0' file; do
+		echo $file
+	done
+	rm ${HOME}/list.ordered.tmp.${PID}
+	rm ${HOME}/list.tmp.${PID}
+	exit
+fi
+
+$(eval ${FILE_GREP_CMD}" > ${HOME}/list.tmp.${PID}")
+$(eval echo -n "${HOME}/list.tmp.${PID}" | sort --files0-from=- -z > ${HOME}/list.ordered.tmp.${PID})
+cat ${HOME}/list.ordered.tmp.${PID} | while read -d $'\0' file; do
+	test -f "$file" || continue;
+	OUT=$(eval $CODE_GREP_CMD)
+	if test "${OUT}" != ""; then
+		echo -e "\e[36m" "$file" "\e[0m"
+		eval $CODE_GREP_CMD
+	fi
+done
+rm ${HOME}/list.ordered.tmp.${PID}
+rm ${HOME}/list.tmp.${PID}
+
