@@ -10,21 +10,12 @@ VBOXNET=vboxnet2
 HOST_SSH_PORT_BASE=65300
 
 if [ ! -f vm.rc ]; then
-	echo You must have a vm.rc file in your current directory.
-	echo Example vm.rc content:
+	echo You must have a vm.rc and some other script file in your current
+	echo directory for initializing your virtual machines.
+	echo Examples can be found in the vbox subdirectory.
 	echo
-	echo declare -A IMAGES_URL
-	echo IMAGES_URL[ubuntu12_04]="https://cloud-images.ubuntu.com/vagrant/precise/current/precise-server-cloudimg-amd64-vagrant-disk1.box"
-	echo IMAGES_URL[ubuntu14_04]="https://cloud-images.ubuntu.com/vagrant/trusty/current/trusty-server-cloudimg-amd64-vagrant-disk1.box"
-	echo VM_NAME_PREFIX=vm
-	echo VBOXNET=vboxnet2
-	echo HOST_SSH_PORT_BASE=60000
-	echo VBOX_NETWORK="192.168.2."
-	echo
-	echo The first run this script will download the vbox vagrant images into ./cache directory and will extract them.
-	echo
-	echo You will need a few other scripts in your working directory for initializing your virtual machine.
-	echo Examples can be found in the vb.tar file.
+	echo The first run this script will download the vbox vagrant images into
+	echo ./cache directory and will extract them.
 	echo 
 fi
 

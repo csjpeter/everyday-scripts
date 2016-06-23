@@ -1,0 +1,132 @@
+#!/bin/bash
+# Copyright Peter Csaszar (Császár Péter) <csjpeter@gmail.com>
+# vi: set ft=sh :
+
+TRAP_LOG="/dev/shm/$(basename $0).trap.log"
+set -o pipefail
+shopt -s expand_aliases
+#trap 'rm \$TRAP_LOG 2> /dev/null || true' EXIT
+function trap_handler()
+{
+    echo $1 > $TRAP_LOG;
+    RET=0
+    let I=0 || true
+    while [ $RET = 0 ]; do
+        TRACE=$(caller $I)
+        RET=$?
+        echo "#$I $TRACE" >> $TRAP_LOG
+        let I++ || true
+    done;
+}
+function catch_return ()
+{
+    ERR_CODE=$?;
+    ERR_LINENO=$(cat ${TRAP_LOG} 2>/dev/null | head -n 1);
+    ERR_TRACE=$(cat ${TRAP_LOG} 2>/dev/null | tail -n +2);
+    return $ERR_CODE;
+}
+alias try='set +e; ( rm $TRAP_LOG 2> /dev/null; trap "trap_handler \${LINENO}" ERR; set -e;'
+alias catch="); catch_return || ";
+
+
+
+try {
+	echo "Default provision ..."
+
+	echo "Turn off all motd messages..."
+	sudo chmod a-x /etc/update-motd.d/* || true
+
+	echo "Create user, add to groups and passwordless sudoers ..."
+	useradd --create-home --shell /bin/bash @GUEST_USER@ || true
+	echo "@GUEST_USER@:@GUEST_USER_PWD@" | chpasswd --md5
+
+	echo "Add user to groups ..."
+	gpasswd -a @GUEST_USER@ sudo 2>/dev/null || true
+	gpasswd -a @GUEST_USER@ wheel 2>/dev/null || true
+	gpasswd -a @GUEST_USER@ admin 2>/dev/null || true
+	gpasswd -a @GUEST_USER@ adm 2>/dev/null || true
+
+	echo "Add user to passwordless sudoers ..."
+	echo "@GUEST_USER@ ALL=(ALL) NOPASSWD:ALL" | tee -a /etc/sudoers
+	sudo -n true || echo "sudoers update error"
+
+	echo "Set up ssh-keys for @GUEST_USER@"
+	mkdir -p /home/@GUEST_USER@/.ssh
+	cp -fa /vagrant/test_ssh_key /home/@GUEST_USER@/.ssh/id_rsa
+	cp -fa /vagrant/test_ssh_key.pub /home/@GUEST_USER@/.ssh/id_rsa.pub
+	cat /vagrant/test_ssh_key.pub > /home/@GUEST_USER@/.ssh/authorized_keys
+	cat /vagrant/tester_id_rsa.pub >> /home/@GUEST_USER@/.ssh/authorized_keys
+	chmod 0644 /home/@GUEST_USER@/.ssh/authorized_keys
+	chmod 0600 /home/@GUEST_USER@/.ssh/id_rsa
+	chmod 0644 /home/@GUEST_USER@/.ssh/id_rsa.pub
+	chmod 0700 /home/@GUEST_USER@/.ssh
+	chown @GUEST_USER@:@GUEST_USER@ -R /home/@GUEST_USER@/.ssh
+
+	echo "Set up authorized_keys for root"
+	mkdir -p /root/.ssh || true
+	chmod 0700 /root/.ssh
+	cat /vagrant/tester_id_rsa.pub >> /root/.ssh/authorized_keys
+	chmod 0644 /root/.ssh/authorized_keys
+
+	echo "Adjust .bashrc for @GUEST_USER@"
+	cat >> /home/@GUEST_USER@/.bashrc <<EOF
+	if [ -z "\$DEBIAN_CHROOT" ] && [ -r /etc/debian_chroot ]; then
+		DEBIAN_CHROOT="("\$(cat /etc/debian_chroot)")"
+	fi
+	export PS1="\[\e[33m\]\$DEBIAN_CHROOT[\\\$(date +%T) \$USER@@VM_NAME@ \W]\\\$\[\e[0m\]"
+EOF
+
+	echo "Adjust .bashrc for root"
+	cat >> /root/.bashrc <<EOF
+	if [ -z "\$DEBIAN_CHROOT" ] && [ -r /etc/debian_chroot ]; then
+		DEBIAN_CHROOT="("\$(cat /etc/debian_chroot)")"
+	fi
+	export PS1="\[\e[33m\]\$DEBIAN_CHROOT[\\\$(date +%T) \$USER@@VM_NAME@ \W]\\\$\[\e[0m\]"
+EOF
+
+	echo "Adjust .bashrc for vagrant user"
+	cat >> /home/vagrant/.bashrc <<EOF
+	if [ -z "\$DEBIAN_CHROOT" ] && [ -r /etc/debian_chroot ]; then
+		DEBIAN_CHROOT="("\$(cat /etc/debian_chroot)")"
+	fi
+	export PS1="\[\e[33m\]\$DEBIAN_CHROOT[\\\$(date +%T) \$USER@@VM_NAME@ \W]\\\$\[\e[0m\]"
+EOF
+	source $HOME/.bashrc
+
+	echo "Vim configuration for @GUEST_USER@"
+	mkdir -p /home/@GUEST_USER@/.vim/colors || true
+	cp /vagrant/.vimrc /home/@GUEST_USER@/.vimrc
+	chown @GUEST_USER@:@GUEST_USER@ /home/@GUEST_USER@/.vimrc
+	cp /vagrant/*.vim /home/@GUEST_USER@/.vim/colors/
+	chown @GUEST_USER@:@GUEST_USER@ -R /home/@GUEST_USER@/.vim
+
+	echo "Vim configuration for root"
+	mkdir -p /root/.vim/colors || true
+	cp /vagrant/.vimrc /root/.vimrc
+	cp /vagrant/*.vim /root/.vim/colors/
+
+	echo "Vim configuration for vagrant user"
+	mkdir -p /home/vagrant/.vim/colors || true
+	cp /vagrant/.vimrc /home/vagrant/.vimrc
+	cp /vagrant/*.vim /home/vagrant/.vim/colors/
+
+
+	if which apt-get; then
+		echo -e "\e[33m"
+		apt-get update
+		apt-get install -y	ntp vim tree mc gdb
+		echo -e "\e[0m"
+	elif which yum; then
+		yum search ntp
+		yum -y install		ntp vim tree mc gdb
+	else
+		echo Unknown OS
+		exit
+	fi
+
+	echo "Default provision done."
+} catch {
+	echo -e "\e[31mError at line $ERR_LINENO code: $ERR_CODE Trace:\e[0m\n$ERR_TRACE";
+	exit $ERR_CODE
+}
+

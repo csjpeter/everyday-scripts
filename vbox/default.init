@@ -1,0 +1,59 @@
+#!/bin/bash
+# Copyright Peter Csaszar (Császár Péter) <csjpeter@gmail.com>
+# vi: set ft=sh :
+
+set -e
+echo "Default init ..."
+
+if which apt-get; then
+	echo Set up hostonly network interface
+	sudo mkdir -p /etc/network/interfaces.d
+	sudo cat >> /etc/network/interfaces.d/eth1.cfg <<EOF
+# The host only network interface
+auto eth1
+iface eth1 inet static
+address @VM_IP@
+netmask 255.255.255.0
+EOF
+	sudo chown root:root /etc/network/interfaces.d/eth1.cfg
+	sudo chmod 0644 /etc/network/interfaces.d/eth1.cfg
+
+	if ! sudo grep ^source /etc/network/interfaces; then
+		echo 'source /etc/network/interfaces.d/*.cfg' >> /etc/network/interfaces
+	fi
+
+	echo Set hostname
+	sudo echo "@VM_IP@" > /etc/hostname
+elif which yum; then
+	echo Set up hostonly network interface
+	sudo cat >> /etc/sysconfig/network-scripts/ifcfg-eth1 <<EOF
+DEVICE=eth1
+BOOTPROTO=none
+ONBOOT=yes
+NETWORK=@VBOX_NETWORK@0
+NETMASK=255.255.255.0
+IPADDR=@VM_IP@
+EOF
+	sudo chown root:root /etc/sysconfig/network-scripts/ifcfg-eth1
+	sudo chmod 0644 /etc/sysconfig/network-scripts/ifcfg-eth1
+
+	echo Set hostname
+	sudo cat >> /etc/sysconfig/network <<EOF
+NETWORKING=yes
+HOSTNAME=@VM_IP@
+EOF
+	sudo chown root:root /etc/sysconfig/network
+	sudo chmod 0644 /etc/sysconfig/network
+
+	sudo echo "@VM_IP@" > /etc/hostname
+else
+	echo Unknwon OS
+	exit
+fi
+
+echo create /vagrant directory
+sudo mkdir -p /vagrant
+sudo chown vagrant:vagrant /vagrant
+sudo chmod 750 /vagrant
+
+echo "Default init done."

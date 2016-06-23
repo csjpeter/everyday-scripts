@@ -1,0 +1,17 @@
+#!/bin/bash
+# vi: set ft=sh :
+
+#	Author: Peter Csaszar (Császár Péter) <csjpeter@gmail.com>
+
+#http://www.vagrantbox.es/
+#https://atlas.hashicorp.com/boxes/search
+
+declare -A IMAGES_URL
+IMAGES_URL[ubuntu12_04]="https://cloud-images.ubuntu.com/vagrant/precise/current/precise-server-cloudimg-amd64-vagrant-disk1.box"
+IMAGES_URL[ubuntu14_04]="https://cloud-images.ubuntu.com/vagrant/trusty/current/trusty-server-cloudimg-amd64-vagrant-disk1.box"
+
+VM_NAME_PREFIX=node
+VBOXNET=vboxnet2
+HOST_SSH_PORT_BASE=60000
+VBOX_NETWORK="192.168.230."
+
