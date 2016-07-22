@@ -610,7 +610,7 @@ case "${CMD}" in
 			exit 1
 		fi
 		# parallel execution of the requested command
-		#PIDS=()
+		PIDS=()
 		declare -A PIDS
 		for ID in ${NODE_ID_LIST}; do
 			echo $CMD on $(vm_name ${ID})
