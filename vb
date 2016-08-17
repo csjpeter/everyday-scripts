@@ -5,7 +5,7 @@ GUEST_USER=$USER
 GUEST_USER_PWD=pwd
 VM_NAME_PREFIX=vm
 VM_TEMPLATE=
-VM_DIR="${HOME}/VirtualBox VMs/"
+VM_DIR="${HOME}/VirtualBox/"
 VBOXNET=vboxnet2
 HOST_SSH_PORT_BASE=65300
 
@@ -232,15 +232,21 @@ function create () # ID PROVISION
 	#vboxmanage hostonlyif ipconfig ${VBOXNET} --ip 192.168.30.1 --netmask 255.255.255.0
 
 	try {
-		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--disk path')" =~ ^([^\"]*\"(.*)--disk path.*)$ ]] || true
-		DISK_SLOT=${BASH_REMATCH[2]} 
+		while read LINE; do
+			[[ "${LINE}" =~ ^([^\"]*\"(.*)--disk path.*)$ ]] || true
+			DISK_SLOT=${BASH_REMATCH[2]}
+			[[ "${DISK_SLOT}" =~ ^(.*unit ([0-9]*).*)$ ]] || true
+			UNIT_ID=${BASH_REMATCH[2]}
+			DISK_SLOTS="${DISK_SLOTS} ${DISK_SLOT} --disk ${VM_DIR}${VM_NAME}/disk${UNIT_ID}.vmdk"
+		done <<< "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--disk path')"
 		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--cpus')" =~ ^([^\"]*\"(.*)--cpus.*)$ ]] || true
 		CPU_SLOT=${BASH_REMATCH[2]} 
 		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--memory')" =~ ^([^\"]*\"(.*)--memory.*)$ ]] || true
 		RAM_SLOT=${BASH_REMATCH[2]} 
 		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--vmname')" =~ ^([^\"]*\"(.*)--vmname.*)$ ]] || true
 		NAME_SLOT=${BASH_REMATCH[2]} 
-		vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOT --disk "${VM_DIR}${VM_NAME}/disk.vmdk" || true
+		echo vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
+		vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
 		vboxmanage modifyvm ${VM_NAME} --nic2 hostonly
 		vboxmanage modifyvm ${VM_NAME} --hostonlyadapter2 ${VBOXNET}
 		vboxmanage modifyvm ${VM_NAME} --cpuexecutioncap 90
