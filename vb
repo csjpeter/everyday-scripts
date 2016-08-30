@@ -17,6 +17,7 @@ if [ ! -f vm.rc ]; then
 	echo The first run this script will download the vbox vagrant images into
 	echo ./cache directory and will extract them.
 	echo 
+	echo Dependencies: sshpass, virtualbox
 fi
 
 source vm.rc
