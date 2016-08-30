@@ -245,8 +245,8 @@ function create () # ID PROVISION
 		RAM_SLOT=${BASH_REMATCH[2]} 
 		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--vmname')" =~ ^([^\"]*\"(.*)--vmname.*)$ ]] || true
 		NAME_SLOT=${BASH_REMATCH[2]} 
-		echo vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vsys 0 --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
-		vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vsys 0 --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
+		echo vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
+		vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
 		vboxmanage modifyvm ${VM_NAME} --nic2 hostonly
 		vboxmanage modifyvm ${VM_NAME} --hostonlyadapter2 ${VBOXNET}
 		vboxmanage modifyvm ${VM_NAME} --cpuexecutioncap 90
