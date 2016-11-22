@@ -174,8 +174,9 @@ function vm_ssh () # remote command
 	sshpass -p vagrant /usr/bin/ssh \
 		-o StrictHostKeyChecking=no \
 		-o UserKnownHostsFile=/dev/null \
-		-q -p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
+		-p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
 		"$@"
+		#-q -p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
 		#-o BatchMode \
 }
 
@@ -617,7 +618,8 @@ case "${CMD}" in
 			exit 1
 		fi
 		# parallel execution of the requested command
-		PIDS=()
+		#PIDS=()
+		unset PIDS
 		declare -A PIDS
 		for ID in ${NODE_ID_LIST}; do
 			echo $CMD on $(vm_name ${ID})
