@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright Peter Csaszar (Császár Péter) <csjpeter@gmail.com>
 
-GUEST_USER=$USER
+GUEST_USER=tester
 GUEST_USER_PWD=pwd
 VM_NAME_PREFIX=vm
 VM_TEMPLATE=
@@ -9,18 +9,18 @@ VM_DIR="${HOME}/VirtualBox/"
 VBOXNET=vboxnet2
 HOST_SSH_PORT_BASE=65300
 
-if [ ! -f vm.rc ]; then
-	echo You must have a vm.rc and some other script file in your current
+if [ ! -f vbox-pool/vm.rc ]; then
+	echo You must have a vm.rc and some other script file in ./vbox-pool
 	echo directory for initializing your virtual machines.
 	echo Examples can be found in the vbox subdirectory.
 	echo
 	echo The first run this script will download the vbox vagrant images into
-	echo ./cache directory and will extract them.
+	echo ~/.vboxes directory and will extract them.
 	echo 
-	echo Dependencies: sshpass, virtualbox
+    exit 1
 fi
 
-source vm.rc
+source vbox-pool/vm.rc
 
 # To download image files from https://atlas.hashicorp.com/debian/ check http://stackoverflow.com/questions/28399324/download-vagrant-box-file-locally-from-atlas-and-configuring-it
 
@@ -76,7 +76,7 @@ function vm_name () # ID
 function vm_info ()
 {
 	VM_NAME=$(vm_name ${1})
-	source ${VM_NAME}.vbox 2> /dev/null
+	source vbox-pool/${VM_NAME}.vbox 2> /dev/null
 
 	INFO=$VM_NAME
 	if [ x$GUEST_OS != "x" ]; then
@@ -108,37 +108,42 @@ function wait_for_workers ()
 	else
 		echo ${FAILED} number of workers failed
 	fi
+    return ${FAILED}
 }
 
 function precache_images ()
 {
-	if ! [ -d ".cache" ]; then
-		mkdir .cache
+	if ! [ -d "/home/${USER}/.vboxes" ]; then
+		mkdir ~/.vboxes
 	fi
 
 	# Start download processes
 	PIDS=()
+    ANY_STARTED="no"
 	declare -A PIDS
 	for I in "${!IMAGES_URL[@]}"; do
-		FILE=.cache/${I}.tar
+		FILE=~/.vboxes/${I}.tar
 		if ! [ -e ${FILE} ]; then
 			echo Caching ${IMAGES_URL[$I]} into file ${FILE}
 			wget -O ${FILE} ${IMAGES_URL[$I]} &
 			PIDS["${I}"]=$!
+            ANY_STARTED="yes"
 		fi
 	done
 
-	wait_for_workers
+    if [ ${ANY_STARTED} = "yes" ]; then
+    	wait_for_workers
+    fi
 
 	# extracting tar files
 	for I in "${!IMAGES_URL[@]}"; do
-		FILE=.cache/${I}.tar
+		FILE=~/.vboxes/${I}.tar
 		f=$(basename ${FILE})
 		vmname=${f%.*}
-		if ! [ -e .cache/${vmname} ]; then
-			mkdir .cache/${vmname}
-			echo Extracting ${FILE} into directory .cache/${vmname}
-			tar xf ${FILE} -C .cache/${vmname}
+		if ! [ -e ~/.vboxes/${vmname} ]; then
+			mkdir ~/.vboxes/${vmname}
+			echo Extracting ${FILE} into directory ~/.vboxes/${vmname}
+			tar xf ${FILE} -C ~/.vboxes/${vmname}
 		fi
 	done
 }
@@ -159,14 +164,14 @@ function export_config () # ID
 	local ID=$1
 	local VM_NAME=$(vm_name ${ID})
 
-	echo "GUEST_USER=${GUEST_USER}" > ${VM_NAME}.vbox
-	echo "GUEST_USER_PWD=${GUEST_USER_PWD}" >> ${VM_NAME}.vbox
-	echo "VM_IP=${VBOX_NETWORK}${ID}" >> ${VM_NAME}.vbox
-	echo "HOST_SSH_PORT=${HOST_SSH_PORT}" >> ${VM_NAME}.vbox
-	echo "VM_NAME=${VM_NAME}" >> ${VM_NAME}.vbox
-	echo "VM_TEMPLATE=\"${VM_TEMPLATE}\"" >> ${VM_NAME}.vbox
-	echo "GUEST_OS=${GUEST_OS}" >> ${VM_NAME}.vbox
-	echo "GUEST_OS_IMAGE_URL=${PWD}/.cache/${GUEST_OS}.tar" >> ${VM_NAME}.vbox
+	echo "GUEST_USER=${GUEST_USER}" > vbox-pool/${VM_NAME}.vbox
+	echo "GUEST_USER_PWD=${GUEST_USER_PWD}" >> vbox-pool/${VM_NAME}.vbox
+	echo "VM_IP=${VBOX_NETWORK}${ID}" >> vbox-pool/${VM_NAME}.vbox
+	echo "HOST_SSH_PORT=${HOST_SSH_PORT}" >> vbox-pool/${VM_NAME}.vbox
+	echo "VM_NAME=${VM_NAME}" >> vbox-pool/${VM_NAME}.vbox
+	echo "VM_TEMPLATE=\"${VM_TEMPLATE}\"" >> vbox-pool/${VM_NAME}.vbox
+	echo "GUEST_OS=${GUEST_OS}" >> vbox-pool/${VM_NAME}.vbox
+	echo "GUEST_OS_IMAGE_URL=/home/${USER}/.vboxes/${GUEST_OS}.tar" >> vbox-pool/${VM_NAME}.vbox
 }
 
 function vm_ssh () # remote command
@@ -174,9 +179,8 @@ function vm_ssh () # remote command
 	sshpass -p vagrant /usr/bin/ssh \
 		-o StrictHostKeyChecking=no \
 		-o UserKnownHostsFile=/dev/null \
-		-p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
+		-q -p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
 		"$@"
-		#-q -p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
 		#-o BatchMode \
 }
 
@@ -185,7 +189,7 @@ function modifyvm-ram () # ID RAM
 	local ID=$1
 	local RAM=$2
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 	vboxmanage modifyvm ${VM_NAME} --memory ${RAM}
 }
 
@@ -195,7 +199,7 @@ function create () # ID PROVISION
 	VM_NAME=$(vm_name ${ID})
 
 	# VM to be created should not exists yet
-	if [ -e ${VM_NAME}.vbox ]; then
+	if [ -e vbox-pool/${VM_NAME}.vbox ]; then
 		echo Already exists: $(vm_info ${ID})
 		exit
 	fi
@@ -227,7 +231,7 @@ function create () # ID PROVISION
 
 	export_config ${ID}
 
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 
 	# creating and setting hostonly network for vbox
 	# vboxmanage hostonlyif create
@@ -240,18 +244,18 @@ function create () # ID PROVISION
 			[[ "${DISK_SLOT}" =~ ^(.*unit ([0-9]*).*)$ ]] || true
 			UNIT_ID=${BASH_REMATCH[2]}
 			DISK_SLOTS="${DISK_SLOTS} ${DISK_SLOT} --disk ${VM_DIR}${VM_NAME}/disk${UNIT_ID}.vmdk"
-		done <<< "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--disk path')"
-		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--cpus')" =~ ^([^\"]*\"(.*)--cpus.*)$ ]] || true
+		done <<< "$(vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--disk path')"
+		[[ "$(vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--cpus')" =~ ^([^\"]*\"(.*)--cpus.*)$ ]] || true
 		CPU_SLOT=${BASH_REMATCH[2]} 
-		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--memory')" =~ ^([^\"]*\"(.*)--memory.*)$ ]] || true
+		[[ "$(vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--memory')" =~ ^([^\"]*\"(.*)--memory.*)$ ]] || true
 		RAM_SLOT=${BASH_REMATCH[2]} 
-		[[ "$(vboxmanage import .cache/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--vmname')" =~ ^([^\"]*\"(.*)--vmname.*)$ ]] || true
+		[[ "$(vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--vmname')" =~ ^([^\"]*\"(.*)--vmname.*)$ ]] || true
 		NAME_SLOT=${BASH_REMATCH[2]} 
-		echo vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
-		vboxmanage import .cache/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
+		echo vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
+		vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
 		vboxmanage modifyvm ${VM_NAME} --nic2 hostonly
 		vboxmanage modifyvm ${VM_NAME} --hostonlyadapter2 ${VBOXNET}
-		vboxmanage modifyvm ${VM_NAME} --cpuexecutioncap 90
+		vboxmanage modifyvm ${VM_NAME} --cpuexecutioncap 80
 		vboxmanage modifyvm ${VM_NAME} --hwvirtex on
 		vboxmanage modifyvm ${VM_NAME} --natpf1 ,tcp,127.0.0.1,${HOST_SSH_PORT},,22
 
@@ -270,13 +274,13 @@ function provision () # ID PROVISION_NAME
 	local ID=$1
 	local PROVISION_NAME=$2
 	VM_NAME=$(vm_name ${ID})
-	source $VM_NAME.vbox
+	source vbox-pool/$VM_NAME.vbox
 
 	try {
 		VMNAME="\e[1m\e[32m${VM_NAME}\e[0m:"
 		
 		echo -e ${VMNAME} provisioning with ${PROVISION_NAME}
-		generate ${PROVISION_NAME}.provision | vm_ssh 'cat > /vagrant/'${PROVISION_NAME}'.provision'
+		generate vbox-pool/${PROVISION_NAME}.provision | vm_ssh 'cat > /vagrant/'${PROVISION_NAME}'.provision'
 		# I can not use vm_ssh here. I need to be able to start
 		# daemon(s) in provision whom does not close the standard
 		# file descriptors.
@@ -299,7 +303,7 @@ function init () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source $VM_NAME.vbox
+	source vbox-pool/$VM_NAME.vbox
 
 	try {
 		VMNAME="\e[1m\e[32m${VM_NAME}\e[0m:"
@@ -308,17 +312,17 @@ function init () # ID
 		startvm ${ID}
 
 		echo -e ${VMNAME} initializing
-		generate default.init | vm_ssh 'cat > default.init;'
-		vm_ssh 'sudo bash default.init'
+		generate vbox-pool/default.init | vm_ssh 'cat > default.init;'
+		vm_ssh 'echo vagrant | sudo -S bash default.init'
 
 		echo -e ${VMNAME} copy files
-		${VM_SCP} test_ssh_key vagrant@127.0.0.1:/vagrant/
-		${VM_SCP} test_ssh_key.pub vagrant@127.0.0.1:/vagrant/
+		${VM_SCP} vbox-pool/test_ssh_key vagrant@127.0.0.1:/vagrant/
+		${VM_SCP} vbox-pool/test_ssh_key.pub vagrant@127.0.0.1:/vagrant/
 		${VM_SCP} ~/.ssh/id_rsa.pub vagrant@127.0.0.1:/vagrant/tester_id_rsa.pub
 		${VM_SCP} ~/.vimrc vagrant@127.0.0.1:/vagrant/
 		${VM_SCP} ~/.vim/colors/*.vim vagrant@127.0.0.1:/vagrant/
-		if [ -e .cache/VBoxGuestAdditions_*.iso ]; then
-			${VM_SCP} .cache/VBoxGuestAdditions_*.iso vagrant@127.0.0.1:/vagrant/
+		if [ -e ~/.vboxes/VBoxGuestAdditions_*.iso ]; then
+			${VM_SCP} ~/.vboxes/VBoxGuestAdditions_*.iso vagrant@127.0.0.1:/vagrant/
 		fi
 
 		provision ${ID} default
@@ -338,13 +342,13 @@ function destroy () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 
-	if [ -e "${VM_NAME}.vbox" ]; then
+	if [ -e "vbox-pool/${VM_NAME}.vbox" ]; then
 		if [ "$(vmstatus $ID)" = "running" ]; then
 			vboxmanage controlvm ${VM_NAME} poweroff
 		fi
-		vboxmanage unregistervm ${VM_NAME} --delete && rm ${VM_NAME}.vbox
+		vboxmanage unregistervm ${VM_NAME} --delete && rm vbox-pool/${VM_NAME}.vbox
 	fi
 }
 
@@ -352,7 +356,7 @@ function startvm () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	if ! [ -e ${VM_NAME}.vbox ]; then
+	if ! [ -e vbox-pool/${VM_NAME}.vbox ]; then
 		echo $VM_NAME does not exist yet. You should create it.
 		exit
 	fi
@@ -385,11 +389,11 @@ function stopvm () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 
 	# stop and wait until ssh can not be used
 	#vboxmanage controlvm ${VM_NAME} acpipowerbutton
-	vm_ssh 'sudo shutdown -h now'
+	vm_ssh 'echo vagrant | sudo -S shutdown -h now'
 	while [ "$(vmstatus $ID)" != "off" ]; do
 		echo -e ${VMNAME} Waiting for off state
 		sleep 1
@@ -400,7 +404,7 @@ function poweroff () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 	if [ "$(vmstatus $ID)" = "running" ]; then
 		vboxmanage controlvm ${VM_NAME} poweroff
 	fi
@@ -410,8 +414,8 @@ function restartvm () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
-	vm_ssh 'sudo shutdown -r now'
+	source vbox-pool/${VM_NAME}.vbox
+	vm_ssh 'echo vagrant | sudo -S shutdown -r now'
 }
 
 function save () # ID
@@ -475,7 +479,7 @@ function motdfix () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	vm_ssh sudo chmod a-x /etc/update-motd.d/* || true
+	vm_ssh echo vagrant | sudo -S chmod a-x /etc/update-motd.d/* || true
 }
 
 function guest-additions () # ID HOST_DIR SF_NAME
@@ -484,11 +488,11 @@ function guest-additions () # ID HOST_DIR SF_NAME
 	local HOST_DIR=$2
 	local SF_NAME=$3
 	VM_NAME=$(vm_name ${ID})
-	source $VM_NAME.vbox
+	source vbox-pool/$VM_NAME.vbox
 
-	vm_ssh sudo apt-get -y install virtualbox-guest-dkms virtualbox-guest-utils virtualbox-guest-x11
+	vm_ssh echo vagrant | sudo -S apt-get -y install virtualbox-guest-dkms virtualbox-guest-utils virtualbox-guest-x11
 	#VM_SCP="sshpass -p vagrant scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -q -P ${HOST_SSH_PORT} "
-	#${VM_SCP} .cache/VBoxGuestAdditions_4.3.34.iso vagrant@127.0.0.1:/vagrant/
+	#${VM_SCP} ~/.vboxes/VBoxGuestAdditions_4.3.34.iso vagrant@127.0.0.1:/vagrant/
 	#echo vboxmanage guestcontrol ${VM_NAME} exec updateadditions --source /vagrant/VBoxGuestAdditions_4.3.34.iso --verbose --wait-start
 	#vboxmanage guestcontrol ${VM_NAME} exec updateadditions --source /vagrant/VBoxGuestAdditions_4.3.34.iso --verbose --wait-start
 	stopvm ${ID}
@@ -500,7 +504,7 @@ function ssh () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 
 	/usr/bin/ssh root@$VM_IP
 }
@@ -509,7 +513,7 @@ function vssh () # ID
 {
 	local ID=$1
 	VM_NAME=$(vm_name ${ID})
-	source ${VM_NAME}.vbox
+	source vbox-pool/${VM_NAME}.vbox
 
 	sshpass -p vagrant /usr/bin/ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -q -p ${HOST_SSH_PORT} vagrant@127.0.0.1
 }
@@ -526,9 +530,9 @@ function list ()
 {
 	printf "%-30s%-16s%-20s%-10s%-30s%s\n" "Name" "OS/Box image" "Ip" "Status" "Used template" "Snapshots"
 	printf "%-30s%-16s%-20s%-10s%-30s%s\n" "----" "------------" "--" "------" "-------------" "---------"
-	for VM_NAME in $(ls -1 ${VM_NAME_PREFIX}-*.vbox 2> /dev/null); do
-		VM_NAME=$(echo $VM_NAME | cut -d . -f 1)
-		source ${VM_NAME}.vbox
+	for VM_NAME in $(ls -1 vbox-pool/${VM_NAME_PREFIX}-*.vbox 2> /dev/null); do
+		VM_NAME=$(basename $VM_NAME | cut -d . -f 1)
+		source vbox-pool/${VM_NAME}.vbox
 		vboxmanage showvminfo ${VM_NAME} > $VM_INFO_LOG
 		STATUSLINE=$(cat $VM_INFO_LOG | grep "^State:")
 		SNAPSHOT_LINE_POS=$(cat $VM_INFO_LOG | grep -n "^Snapshots:" | cut -d : -f 1 -)
@@ -619,16 +623,17 @@ case "${CMD}" in
 		fi
 		# parallel execution of the requested command
 		#PIDS=()
-		unset PIDS
+        unset PIDS
 		declare -A PIDS
 		for ID in ${NODE_ID_LIST}; do
 			echo $CMD on $(vm_name ${ID})
 
-			(${CMD} ${ID} $@ 2>&1 | tee ./$(vm_name ${ID}).log) &
+			(${CMD} ${ID} $@ 2>&1 | tee ./vbox-pool/$(vm_name ${ID}).log) &
 			PIDS[${ID}]=$!
 		done
 
 		wait_for_workers
+        exit $?
 		;;
 esac
 
