@@ -373,7 +373,8 @@ function startvm () # ID
 	let I=0 || true
 	while [ $I -lt 10 ]; do
 		set +e
-		vm_ssh true 2> /dev/null
+		#vm_ssh true 2> /dev/null
+	    /usr/bin/ssh root@$VM_IP -- true 2> /dev/null
 		RET=$?
 		set -e
 		if [ $RET = 0 ]; then
