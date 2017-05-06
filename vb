@@ -8,6 +8,7 @@ VM_TEMPLATE=
 VM_DIR="${HOME}/VirtualBox/"
 VBOXNET=vboxnet2
 HOST_SSH_PORT_BASE=65300
+VM_RAM_SIZE=1024
 
 if [ ! -f vbox-pool/vm.rc ]; then
 	echo You must have a vm.rc and some other script file in ./vbox-pool
@@ -251,12 +252,17 @@ function create () # ID PROVISION
 		RAM_SLOT=${BASH_REMATCH[2]} 
 		[[ "$(vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf -n 2> /dev/null | grep '\--vmname')" =~ ^([^\"]*\"(.*)--vmname.*)$ ]] || true
 		NAME_SLOT=${BASH_REMATCH[2]} 
-		echo vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
-		vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory 1024 $DISK_SLOTS || true
+		echo vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory $VM_RAM_SIZE $DISK_SLOTS || true
+		vboxmanage import ~/.vboxes/${GUEST_OS}/box.ovf $NAME_SLOT --vmname "${VM_NAME}" $CPU_SLOT --cpus 1 $RAM_SLOT --memory $VM_RAM_SIZE $DISK_SLOTS || true
+		echo vboxmanage modifyvm ${VM_NAME} --nic2 hostonly
 		vboxmanage modifyvm ${VM_NAME} --nic2 hostonly
+		echo vboxmanage modifyvm ${VM_NAME} --hostonlyadapter2 ${VBOXNET}
 		vboxmanage modifyvm ${VM_NAME} --hostonlyadapter2 ${VBOXNET}
+		echo vboxmanage modifyvm ${VM_NAME} --cpuexecutioncap 80
 		vboxmanage modifyvm ${VM_NAME} --cpuexecutioncap 80
+		echo vboxmanage modifyvm ${VM_NAME} --hwvirtex on
 		vboxmanage modifyvm ${VM_NAME} --hwvirtex on
+		echo vboxmanage modifyvm ${VM_NAME} --natpf1 ,tcp,127.0.0.1,${HOST_SSH_PORT},,22
 		vboxmanage modifyvm ${VM_NAME} --natpf1 ,tcp,127.0.0.1,${HOST_SSH_PORT},,22
 
 		init ${ID} # will provision default
