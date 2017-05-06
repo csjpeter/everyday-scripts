@@ -331,13 +331,18 @@ function init () # ID
 			${VM_SCP} ~/.vboxes/VBoxGuestAdditions_*.iso vagrant@127.0.0.1:/vagrant/
 		fi
 
-		provision ${ID} default
+		echo -e ${VMNAME} initialized
+	} catch {
+		echo -e "\e[31mError at line $ERR_LINENO code: $ERR_CODE Trace:\e[0m\n$ERR_TRACE";
+		exit $ERR_CODE
+	}
+
+	try {
+		provision ${ID} default || true
 
 		# reboot and wait until ssh can not be (shut down) and then again can be used (start up)
 		stopvm ${ID}
 		startvm ${ID}
-
-		echo -e ${VMNAME} initialized
 	} catch {
 		echo -e "\e[31mError at line $ERR_LINENO code: $ERR_CODE Trace:\e[0m\n$ERR_TRACE";
 		exit $ERR_CODE
