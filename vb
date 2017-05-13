@@ -92,6 +92,7 @@ function vm_info ()
 function wait_for_workers ()
 {
 	echo Waiting for all VM to get ready ...
+	FAILED_LIST=""
 
 	FAILED=0
 	for ID in ${!PIDS[@]}; do
@@ -101,13 +102,16 @@ function wait_for_workers ()
 		if [ $? != 0 ]; then
 			let FAILED++
 			echo Worker failed for ${VM_NAME}
+			FAILED_LIST=${FAILED_LIST}"\n"$ID
 		fi
 	done;
 	if [ ${FAILED} = 0 ]; then
 		echo All worker is successful
 		:; # do nothing
 	else
-		echo ${FAILED} number of workers failed
+		echo ${FAILED}" number of workers failed"
+		FAILED_LIST=$(echo -e ${FAILED_LIST} | sort | tr '\n' ' ')
+		echo "Failed node IDs: "${FAILED_LIST}
 	fi
     return ${FAILED}
 }
@@ -290,11 +294,14 @@ function provision () # ID PROVISION_NAME
 		# I can not use vm_ssh here. I need to be able to start
 		# daemon(s) in provision whom does not close the standard
 		# file descriptors.
-		sshpass -p vagrant /usr/bin/ssh -t -t \
-			-o StrictHostKeyChecking=no \
-			-o UserKnownHostsFile=/dev/null \
-			-q -p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
-			'sudo bash /vagrant/'${PROVISION_NAME}'.provision'
+		#sshpass -p vagrant /usr/bin/ssh -t -t \
+		#	-o StrictHostKeyChecking=no \
+		#	-o UserKnownHostsFile=/dev/null \
+		#	-q -p ${HOST_SSH_PORT} vagrant@127.0.0.1 -- \
+		#	sudo bash /vagrant/${PROVISION_NAME}.provision
+		vm_ssh 'echo vagrant | sudo -S rm -f /vagrant/'${PROVISION_NAME}'.provision.done'
+		vm_ssh 'echo vagrant | sudo -S bash /vagrant/'${PROVISION_NAME}'.provision'
+		vm_ssh 'ls /vagrant/'${PROVISION_NAME}'.provision.done'
 		echo -e ${VMNAME} provisioned with ${PROVISION_NAME}
 
 		VM_TEMPLATE=$(echo $(printf '%s\n' ${VM_TEMPLATE} ${PROVISION_NAME} | sed -e "s|,||g" | sort -u))
@@ -338,8 +345,7 @@ function init () # ID
 	}
 
 	try {
-		provision ${ID} default || true
-
+		provision ${ID} default
 		# reboot and wait until ssh can not be (shut down) and then again can be used (start up)
 		stopvm ${ID}
 		startvm ${ID}
