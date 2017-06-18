@@ -549,8 +549,8 @@ function boxlist ()
 
 function list ()
 {
-	printf "%-30s%-16s%-20s%-10s%-30s%s\n" "Name" "OS/Box image" "Ip" "Status" "Used template" "Snapshots"
-	printf "%-30s%-16s%-20s%-10s%-30s%s\n" "----" "------------" "--" "------" "-------------" "---------"
+	printf "%-30s%-16s%-20s%-10s%-20s%s\n" "Name" "OS/Box image" "Ip" "Status" "Snapshots" "Used template"
+	printf "%-30s%-16s%-20s%-10s%-20s%s\n" "----" "------------" "--" "------" "---------" "-------------"
 	for VM_NAME in $(ls -1 ${VBOX_POOL}/${VM_NAME_PREFIX}-*.vbox 2> /dev/null); do
 		VM_NAME=$(basename $VM_NAME | cut -d . -f 1)
 		source ${VBOX_POOL}/${VM_NAME}.vbox
@@ -574,7 +574,7 @@ function list ()
 			STATUS=unknown
 		fi
 
-		printf "%-30s%-16s%-20s%-10s%-30s%s\n" "$VM_NAME" "$GUEST_OS" "$VM_IP" "$STATUS" "$VM_TEMPLATE" "$SNAPSHOT_LIST"
+		printf "%-30s%-16s%-20s%-10s%-20s%s\n" "$VM_NAME" "$GUEST_OS" "$VM_IP" "$STATUS" "$SNAPSHOT_LIST" "$VM_TEMPLATE"
 	done
 }
 
