@@ -81,10 +81,10 @@ function vm_info ()
 	source ${VBOX_POOL}/${VM_NAME}.vbox 2> /dev/null
 
 	INFO=$VM_NAME
-	if [ x$GUEST_OS != "x" ]; then
+	if [ "x$GUEST_OS" != "x" ]; then
 		INFO=$INFO"\t"$GUEST_OS
 	fi
-	if [ x$VM_TEMPLATE != "x" ]; then
+	if [ "x$VM_TEMPLATE" != "x" ]; then
 		INFO=$INFO"\t"$VM_TEMPLATE
 	fi
 	echo -e $INFO
@@ -313,6 +313,24 @@ function provision () # ID PROVISION_NAME
 	}
 }
 
+function clear_provision () # ID PROVISION_NAME
+{
+	local ID=$1
+	local PROVISION_NAME=$2
+	VM_NAME=$(vm_name ${ID})
+	source ${VBOX_POOL}/$VM_NAME.vbox
+
+	try {
+		VMNAME="\e[1m\e[32m${VM_NAME}\e[0m:"
+		echo -e ${VMNAME} remove provision note ${PROVISION_NAME}
+		VM_TEMPLATE=$(echo $(printf '%s\n' ${VM_TEMPLATE} | sed -e "s|${PROVISION_NAME}||g" | sort -u))
+		export_config ${ID}
+	} catch {
+		echo -e "\e[31mError at line $ERR_LINENO code: $ERR_CODE Trace:\e[0m\n$ERR_TRACE";
+		exit $ERR_CODE
+	}
+}
+
 function init () # ID
 {
 	local ID=$1
@@ -416,7 +434,7 @@ function stopvm () # ID
 	#vboxmanage controlvm ${VM_NAME} acpipowerbutton
 	vm_ssh 'echo vagrant | sudo -S shutdown -h now'
 	while [ "$(vmstatus $ID)" != "off" ]; do
-		echo -e ${VMNAME} Waiting for off state
+		#echo -e ${VMNAME} Waiting for off state
 		sleep 1
 	done
 }
