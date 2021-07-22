@@ -12,7 +12,7 @@ while test "x$1" != "x"; do
 	shift
 done
 
-NGREP="ngrep -n \"\(build-for-\|\.svn\|\.swp$\|~$|\)\" -n \"\.moc/\" \"\.\(h\|c\|cpp\|cc\|py\|rb\|php\|java\|qml\|js\|css\|html\|sh\)$\" $END_FILE_GREP $PARAMS"
+NGREP="ngrep -n \"\(doxy\|docs\|test\|builder\|tmpDir\|build-for-\|\.svn\|\.swp$\|~$|\)\" -n \"\.moc/\" \"\.\(go\|h\|c\|cpp\|cc\|py\|rb\|php\|java\|qml\|js\|css\|html\|sh\)$\" $END_FILE_GREP $PARAMS"
 
 echo -en "\e[1m"
 echo "ngrep command:	[$NGREP]"

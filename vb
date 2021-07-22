@@ -485,13 +485,22 @@ function del_snapshot () # ID SNAPSHOT_NAME
 	VM_NAME=$(vm_name ${ID})
 	shift
 
-	if [ "x$1" != "x" ]; then
-		NAME=$1
-	else
-		NAME="default-snapshot"
-	fi
+	#if [ "x$1" != "x" ]; then
+	#	NAME=$1
+	#else
+	#	NAME="default-snapshot"
+	#fi
 
-	vboxmanage snapshot ${VM_NAME} delete $NAME
+	#vboxmanage snapshot ${VM_NAME} delete $NAME
+
+    LAST_SNAPSHOT_ID=$(vboxmanage snapshot ${VM_NAME} list | grep -oP 'UUID: [^\)]*' | cut -d' ' -f2 | tail -n 1)
+    if [ "x${LAST_SNAPSHOT_ID}" = "x" ]; then
+        echo No more snapshot to delete
+        return 0
+    fi
+
+	echo "[]$ "vboxmanage snapshot ${VM_NAME} delete ${LAST_SNAPSHOT_ID}
+	vboxmanage snapshot ${VM_NAME} delete ${LAST_SNAPSHOT_ID}
 }
 
 function restore () # ID SNAPSHOT_NAME
@@ -581,6 +590,7 @@ function list ()
 			SNAPSHOT_LIST=$(cat $VM_INFO_LOG | \
 					tail -n $SNAPSHOT_LINES | \
 					grep "Name:" | \
+                    #grep -oP 'Name: \K[^ ]*' | uniq | tr '\n' ' ')
 					grep -oP 'Name: \K[^ ]*' | tr '\n' ' ')
 		else
 			SNAPSHOT_LIST=""
