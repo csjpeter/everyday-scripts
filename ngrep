@@ -23,7 +23,7 @@ while test "x$1" != "x"; do
 			CODE_GREP_CMD="$CODE_GREP_CMD | grep --color=always"
 		fi
 		test "$1" = "-n" && CODE_GREP_CMD="$CODE_GREP_CMD -v" && shift
-		CODE_GREP_CMD="$CODE_GREP_CMD \"$1\""
+		CODE_GREP_CMD="$CODE_GREP_CMD '$1'"
 		shift
 	fi
 done

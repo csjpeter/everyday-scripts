@@ -8,7 +8,7 @@ while test "x$1" != "x"; do
 	if test "$1" = "--"; then
 		END_FILE_GREP=""
 	fi
-	PARAMS="$PARAMS \"$1\""
+	PARAMS="$PARAMS '$1'"
 	shift
 done
 
